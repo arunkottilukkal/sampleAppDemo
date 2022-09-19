@@ -18,8 +18,8 @@ on:
        # This is the path of your Function app in Git.
       GIT_FunctionApp_PATH:
         description: 'Relative path for Function'
-        required: true
-        default: '/home'
+        required: false
+        default: '/'
 
 jobs:
   build:
