@@ -1,22 +1,32 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/azure/functions-action
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-# More info on Python, GitHub Actions, and Azure Functions: https://aka.ms/python-webapps-actions
-
-name: Build and deploy Python project to Azure Function App - sample-application-demo
+name: PII-Function-App
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
 
-env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
-  PYTHON_VERSION: '3.8' # set this to the python version to use (supports 3.6, 3.7, 3.8)
+  workflow_dispatch:
+    inputs:
+      # This is the path of your Azure Function in Git.  
+      GIT_FunctionApp_Name:
+        description: 'sample-application-demo'
+        required: true
+        default: 'sample-application-demo'
+        
+      GIT_FunctionApp_URL:
+        description: 'https://sample-application-demo.azurewebsites.net'
+        required: true
+        default: 'https://sample-application-demo.azurewebsites.net'
+        
+       # This is the path of your Function app in Git.
+      GIT_FunctionApp_PATH:
+        description: 'Relative path for Function'
+        required: true
+        default: '/'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      AZURE_FUNCTIONAPP_PACKAGE_PATH: ${{ github.workspace }}/${{ github.event.inputs.GIT_FunctionApp_PATH }} # set this to the path to your web app project, defaults to the repository root
+      PYTHON_VERSION: '3.9' # set this to the python version to use (supports 3.6, 3.7, 3.8)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -25,46 +35,40 @@ jobs:
         uses: actions/setup-python@v1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Create and start virtual environment
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-
+      
+      #Install All the Required Depenedent Modules
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pushd $GITHUB_WORKSPACE/${{ github.event.inputs.GIT_FunctionApp_PATH }}
+          pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+          popd
         
-      # Optional: Add step to run tests here
-
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v2
         with:
           name: python-app
           path: |
-            . 
+            ${{ github.workspace }}/${{ github.event.inputs.GIT_FunctionApp_PATH }}
             !venv/
 
-  deploy:
+  Deploy:
     runs-on: ubuntu-latest
     needs: build
     environment:
       name: 'Production'
-      url: ${{ steps.deploy-to-function.outputs.webapp-url }}
+      url: ${{ github.event.inputs.GIT_FunctionApp_URL }}
 
     steps:
       - name: Download artifact from build job
         uses: actions/download-artifact@v2
         with:
           name: python-app
-          path: .
+          path: ${{ github.workspace }}/${{ github.event.inputs.GIT_FunctionApp_PATH }}
 
       - name: 'Deploy to Azure Functions'
         uses: Azure/functions-action@v1
         id: deploy-to-function
         with:
-          app-name: 'sample-application-demo'
-          slot-name: 'Production'
-          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          app-name: ${{ github.event.inputs.GIT_FunctionApp_Name }}
+          package: ${{ github.workspace }}/${{ github.event.inputs.GIT_FunctionApp_PATH }}
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_14F5005F26B849CD8F1E14BE02410CA4 }}
-          scm-do-build-during-deployment: true
-          enable-oryx-build: true
